@@ -31,6 +31,13 @@ let priceHistory = {
   silver: []
 }
 
+// Crypto cache
+let cryptoCache = {
+  top10: [],
+  prices: {},
+  lastUpdate: null
+}
+
 // === PRICE FETCHING ===
 
 // Primary: Use goldapi.io
@@ -156,6 +163,79 @@ async function fetchPrices() {
   }
   
   return priceCache
+}
+
+// === CRYPTO FETCHING (CoinGecko - free API) ===
+
+async function fetchTopCryptos() {
+  try {
+    // Fetch top 10 by market cap
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h'
+    )
+    
+    if (!res.ok) {
+      console.error('CoinGecko API error:', res.status)
+      return null
+    }
+    
+    const coins = await res.json()
+    
+    cryptoCache.top10 = coins.map(coin => ({
+      id: coin.id,
+      symbol: coin.symbol.toUpperCase(),
+      name: coin.name,
+      price: coin.current_price,
+      change24h: coin.price_change_24h,
+      changePercent24h: coin.price_change_percentage_24h,
+      marketCap: coin.market_cap,
+      image: coin.image
+    }))
+    
+    // Also store prices by id for quick lookup
+    cryptoCache.prices = {}
+    coins.forEach(coin => {
+      cryptoCache.prices[coin.id] = {
+        price: coin.current_price,
+        symbol: coin.symbol.toUpperCase(),
+        name: coin.name,
+        change24h: coin.price_change_24h,
+        changePercent24h: coin.price_change_percentage_24h,
+        image: coin.image
+      }
+    })
+    
+    cryptoCache.lastUpdate = new Date().toISOString()
+    console.log('Crypto prices updated:', cryptoCache.top10.map(c => c.symbol).join(', '))
+    
+    return cryptoCache
+  } catch (e) {
+    console.error('CoinGecko fetch error:', e.message)
+    return null
+  }
+}
+
+// Fetch specific crypto price (for cryptos not in top 10)
+async function fetchCryptoPrice(coinId) {
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=eur&include_24hr_change=true`
+    )
+    
+    if (!res.ok) return null
+    
+    const data = await res.json()
+    if (data[coinId]) {
+      return {
+        price: data[coinId].eur,
+        changePercent24h: data[coinId].eur_24h_change
+      }
+    }
+    return null
+  } catch (e) {
+    console.error('Crypto price fetch error:', e.message)
+    return null
+  }
 }
 
 // === NEWS FETCHING ===
@@ -304,15 +384,23 @@ function calculateAdvice(metal) {
 
 // === API ROUTES ===
 
-// Get all data (prices + news + advice)
+// Get all data (prices + news + advice + crypto)
 app.get('/api/dashboard', async (req, res) => {
   // Fetch if cache is old (> 5 min)
   const cacheAge = priceCache.lastUpdate 
     ? Date.now() - new Date(priceCache.lastUpdate).getTime() 
     : Infinity
     
+  const cryptoCacheAge = cryptoCache.lastUpdate
+    ? Date.now() - new Date(cryptoCache.lastUpdate).getTime()
+    : Infinity
+    
   if (cacheAge > 5 * 60 * 1000) {
     await Promise.all([fetchPrices(), fetchNews()])
+  }
+  
+  if (cryptoCacheAge > 5 * 60 * 1000) {
+    await fetchTopCryptos()
   }
   
   res.json({
@@ -333,8 +421,32 @@ app.get('/api/dashboard', async (req, res) => {
     history: {
       gold: priceHistory.gold.slice(-24), // Last 24 data points
       silver: priceHistory.silver.slice(-24)
+    },
+    crypto: {
+      top10: cryptoCache.top10,
+      prices: cryptoCache.prices,
+      lastUpdate: cryptoCache.lastUpdate
     }
   })
+})
+
+// Get crypto prices for specific coins
+app.get('/api/crypto/prices', async (req, res) => {
+  const ids = req.query.ids?.split(',') || []
+  
+  if (ids.length === 0) {
+    return res.json({ prices: cryptoCache.prices })
+  }
+  
+  // Return cached prices for requested IDs
+  const prices = {}
+  for (const id of ids) {
+    if (cryptoCache.prices[id]) {
+      prices[id] = cryptoCache.prices[id]
+    }
+  }
+  
+  res.json({ prices })
 })
 
 // Force refresh
@@ -355,13 +467,19 @@ app.listen(PORT, '0.0.0.0', async () => {
   // Initial fetch
   await fetchPrices()
   await fetchNews()
-  console.log('Initial data loaded')
+  await fetchTopCryptos()
+  console.log('Initial data loaded (metals + crypto)')
   
-  // Refresh every 5 minutes
+  // Refresh metals every 5 minutes
   setInterval(async () => {
     await fetchPrices()
-    console.log(`Prices updated: Gold €${priceCache.gold?.price?.toFixed(2)}, Silver €${priceCache.silver?.price?.toFixed(2)}`)
+    console.log(`Metals updated: Gold €${priceCache.gold?.price?.toFixed(2)}, Silver €${priceCache.silver?.price?.toFixed(2)}`)
   }, 5 * 60 * 1000)
+  
+  // Refresh crypto every 2 minutes (CoinGecko allows more frequent calls)
+  setInterval(async () => {
+    await fetchTopCryptos()
+  }, 2 * 60 * 1000)
   
   // Refresh news every 30 minutes
   setInterval(fetchNews, 30 * 60 * 1000)
