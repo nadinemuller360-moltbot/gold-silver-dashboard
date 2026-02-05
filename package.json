@@ -1,0 +1,15 @@
+{
+  "name": "gold-silver-dashboard",
+  "version": "1.0.0",
+  "description": "Gold/Silver price dashboard with news and buy/hold/sell advice",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  }
+}

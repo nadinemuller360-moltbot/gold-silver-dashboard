@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  gold-silver-dashboard:
+    build: .
+    container_name: gold-silver-dashboard
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - GOLD_API_KEY=${GOLD_API_KEY}
+      - NEWS_API_KEY=${NEWS_API_KEY}
+    restart: unless-stopped

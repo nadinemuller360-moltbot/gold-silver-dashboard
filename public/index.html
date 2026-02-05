@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gold/Silver Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+      padding: 20px;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    h1 { font-size: 1.8rem; display: flex; align-items: center; gap: 10px; }
+    .last-update { font-size: 0.85rem; color: #71717a; }
+    .refresh-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover { background: rgba(255,255,255,0.2); }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+    
+    .card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .metal-card {
+      position: relative;
+      overflow: hidden;
+    }
+    .metal-card.gold { border-left: 4px solid #fbbf24; }
+    .metal-card.silver { border-left: 4px solid #94a3b8; }
+    
+    .metal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+    .metal-icon { font-size: 2.5rem; }
+    .metal-name { font-size: 1.4rem; font-weight: 600; margin-top: 8px; }
+    
+    .price-main {
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: white;
+    }
+    .price-sub { font-size: 1rem; color: #a1a1aa; margin-top: 4px; }
+    
+    .change {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .change.up { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .change.down { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .change.neutral { background: rgba(161, 161, 170, 0.2); color: #a1a1aa; }
+    
+    .advice-box {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .advice-box.buy { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); }
+    .advice-box.sell { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); }
+    .advice-box.hold { background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); }
+    
+    .advice-label { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+    .advice-box.buy .advice-label { color: #22c55e; }
+    .advice-box.sell .advice-label { color: #ef4444; }
+    .advice-box.hold .advice-label { color: #fbbf24; }
+    
+    .confidence { font-size: 0.9rem; color: #a1a1aa; }
+    .confidence-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .confidence-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+    .advice-box.buy .confidence-fill { background: #22c55e; }
+    .advice-box.sell .confidence-fill { background: #ef4444; }
+    .advice-box.hold .confidence-fill { background: #fbbf24; }
+    
+    .reasons {
+      margin-top: 12px;
+      text-align: left;
+      font-size: 0.85rem;
+      color: #a1a1aa;
+    }
+    .reasons li { margin: 4px 0; padding-left: 12px; position: relative; }
+    .reasons li::before { content: '•'; position: absolute; left: 0; }
+    
+    .news-section { margin-top: 30px; }
+    .news-section h2 { font-size: 1.3rem; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    
+    .news-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 16px; }
+    
+    .news-item {
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: all 0.2s;
+    }
+    .news-item:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
+    .news-item a { color: inherit; text-decoration: none; }
+    .news-title { font-weight: 600; margin-bottom: 8px; line-height: 1.4; }
+    .news-meta { font-size: 0.8rem; color: #71717a; display: flex; justify-content: space-between; }
+    
+    .chart-container {
+      margin-top: 16px;
+      height: 60px;
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      padding: 8px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+    }
+    .chart-bar {
+      flex: 1;
+      border-radius: 2px;
+      min-height: 4px;
+      transition: height 0.3s;
+    }
+    .gold .chart-bar { background: #fbbf24; }
+    .silver .chart-bar { background: #94a3b8; }
+    
+    .disclaimer {
+      margin-top: 30px;
+      padding: 16px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #fca5a5;
+    }
+    
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 200px;
+      color: #71717a;
+    }
+    
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .news-grid { grid-template-columns: 1fr; }
+      .price-main { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>🥇 Gold/Silver Dashboard</h1>
+        <div class="last-update" id="last-update">Loading...</div>
+      </div>
+      <button class="refresh-btn" onclick="refreshData()">🔄 Refresh</button>
+    </header>
+    
+    <div class="grid" id="prices">
+      <div class="loading">Loading prices...</div>
+    </div>
+    
+    <div class="news-section">
+      <h2>📰 Latest News</h2>
+      <div class="news-grid" id="news">
+        <div class="loading">Loading news...</div>
+      </div>
+    </div>
+    
+    <div class="disclaimer">
+      ⚠️ <strong>Disclaimer:</strong> This dashboard is for informational purposes only and does not constitute financial advice. 
+      Always do your own research and consult with a qualified financial advisor before making investment decisions.
+      Past performance is not indicative of future results.
+    </div>
+  </div>
+  
+  <script>
+    let data = null
+    
+    async function fetchData() {
+      try {
+        const res = await fetch('/api/dashboard')
+        data = await res.json()
+        render()
+      } catch (e) {
+        console.error('Failed to fetch data:', e)
+      }
+    }
+    
+    async function refreshData() {
+      document.querySelector('.refresh-btn').textContent = '⏳ Refreshing...'
+      await fetch('/api/refresh', { method: 'POST' })
+      await fetchData()
+      document.querySelector('.refresh-btn').textContent = '🔄 Refresh'
+    }
+    
+    function formatPrice(price) {
+      return new Intl.NumberFormat('nl-NL', { 
+        style: 'currency', 
+        currency: 'EUR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(price)
+    }
+    
+    function formatChange(change, percent) {
+      if (change === null || change === undefined) return { text: '—', class: 'neutral' }
+      const sign = change >= 0 ? '+' : ''
+      const cls = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral'
+      const percentText = percent !== null ? ` (${sign}${percent.toFixed(2)}%)` : ''
+      return { text: `${sign}${formatPrice(change)}${percentText}`, class: cls }
+    }
+    
+    function renderChart(history, metalClass) {
+      if (!history || history.length < 2) return ''
+      
+      const prices = history.map(h => h.price)
+      const min = Math.min(...prices)
+      const max = Math.max(...prices)
+      const range = max - min || 1
+      
+      const bars = prices.map(p => {
+        const height = ((p - min) / range) * 100
+        return `<div class="chart-bar" style="height: ${Math.max(10, height)}%"></div>`
+      }).join('')
+      
+      return `<div class="chart-container ${metalClass}">${bars}</div>`
+    }
+    
+    function renderMetal(metal, metalData, advice, history, icon, name) {
+      if (!metalData) return `<div class="card metal-card ${metal}"><div class="loading">No data available</div></div>`
+      
+      const change = formatChange(metalData.change24h, metalData.changePercent24h)
+      const adviceClass = advice.advice.toLowerCase()
+      
+      return `
+        <div class="card metal-card ${metal}">
+          <div class="metal-header">
+            <div>
+              <div class="metal-icon">${icon}</div>
+              <div class="metal-name">${name}</div>
+            </div>
+            <span class="change ${change.class}">${change.text}</span>
+          </div>
+          
+          <div class="price-main">${formatPrice(metalData.price)}</div>
+          <div class="price-sub">per troy ounce · ${formatPrice(metalData.pricePerGram)}/gram</div>
+          
+          ${renderChart(history, metal)}
+          
+          <div class="advice-box ${adviceClass}">
+            <div class="advice-label">${advice.advice}</div>
+            <div class="confidence">Confidence: ${advice.confidence}%</div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width: ${advice.confidence}%"></div>
+            </div>
+            <ul class="reasons">
+              ${advice.reasons.map(r => `<li>${r}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `
+    }
+    
+    function renderNews(newsItems, metal) {
+      if (!newsItems || newsItems.length === 0) return ''
+      
+      return newsItems.slice(0, 3).map(item => `
+        <div class="news-item">
+          <a href="${item.url || '#'}" target="_blank" rel="noopener">
+            <div class="news-title">${item.title}</div>
+            <div class="news-meta">
+              <span>${item.source || 'News'}</span>
+              <span>${item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('nl-NL') : ''}</span>
+            </div>
+          </a>
+        </div>
+      `).join('')
+    }
+    
+    function render() {
+      if (!data) return
+      
+      // Update timestamp
+      document.getElementById('last-update').textContent = 
+        `Last update: ${data.prices.lastUpdate ? new Date(data.prices.lastUpdate).toLocaleString('nl-NL') : 'Unknown'}`
+      
+      // Render prices
+      document.getElementById('prices').innerHTML = `
+        ${renderMetal('gold', data.prices.gold, data.advice.gold, data.history.gold, '🥇', 'Gold (XAU)')}
+        ${renderMetal('silver', data.prices.silver, data.advice.silver, data.history.silver, '🥈', 'Silver (XAG)')}
+      `
+      
+      // Render news
+      document.getElementById('news').innerHTML = `
+        <div>
+          <h3 style="font-size: 1rem; color: #fbbf24; margin-bottom: 12px;">🥇 Gold News</h3>
+          ${renderNews(data.news.gold, 'gold')}
+        </div>
+        <div>
+          <h3 style="font-size: 1rem; color: #94a3b8; margin-bottom: 12px;">🥈 Silver News</h3>
+          ${renderNews(data.news.silver, 'silver')}
+        </div>
+      `
+    }
+    
+    // Initial load
+    fetchData()
+    
+    // Auto-refresh every 5 minutes
+    setInterval(fetchData, 5 * 60 * 1000)
+  </script>
+</body>
+</html>
